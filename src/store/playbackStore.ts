@@ -280,8 +280,26 @@ export function createPlaybackController(
 
 export type PlaybackController = ReturnType<typeof createPlaybackController>;
 
+function createPlaybackAudioContext(): AudioContext {
+  const AC =
+    window.AudioContext ??
+    (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+  if (!AC) throw new Error("Web Audio API not supported");
+  return new AC();
+}
+
+function setAudioSessionType(type: "playback" | "transient" | "ambient"): void {
+  try {
+    const session = (navigator as Navigator & { audioSession?: { type: string } }).audioSession;
+    if (session) session.type = type;
+  } catch {
+    /* Safari < 17.2 or unsupported */
+  }
+}
+
 const defaultEngine = new AudioEngine({
-  createContext: () => new AudioContext(),
+  createContext: createPlaybackAudioContext,
+  setAudioSessionType,
 });
 
 export const { store: playbackStore, actions: playbackActions } =
