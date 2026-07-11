@@ -1,3 +1,4 @@
+import { CustomPage } from "../features/mixer/CustomPage";
 import { RecommendPage } from "../features/scenes/RecommendPage";
 import { TopTabs } from "../features/scenes/TopTabs";
 import { playbackActions } from "../store/playbackStore";
@@ -9,13 +10,7 @@ export function App() {
   return (
     <div className="relative h-full min-h-dvh overflow-hidden bg-black text-white">
       <TopTabs tab={tab} onTabChange={(next) => playbackActions.setTab(next)} />
-      {tab === "recommend" ? (
-        <RecommendPage />
-      ) : (
-        <div className="flex h-full min-h-dvh items-center justify-center text-lg text-white/70">
-          自选
-        </div>
-      )}
+      {tab === "recommend" ? <RecommendPage /> : <CustomPage />}
     </div>
   );
 }
