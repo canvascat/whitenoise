@@ -1,7 +1,9 @@
 import { useEffect } from "react";
+import { sceneLqipUrl } from "../data/paths";
 import { CustomPage } from "../features/mixer/CustomPage";
 import { RecommendPage } from "../features/scenes/RecommendPage";
 import { TopTabs } from "../features/scenes/TopTabs";
+import { applyChromeColor, resetChromeColor, sampleTopColorFromUrl } from "../lib/dominantColor";
 import { updateMediaSession } from "../lib/mediaSession";
 import { playbackActions } from "../store/playbackStore";
 import { usePlayback } from "../store/usePlayback";
@@ -42,8 +44,34 @@ export function App() {
     return () => document.removeEventListener("visibilitychange", onVisible);
   }, [status]);
 
+  // Tint iOS status bar / overscroll to match the scene’s top colors.
+  useEffect(() => {
+    if (tab !== "recommend") {
+      resetChromeColor();
+      return;
+    }
+    const scene = scenes[sceneIndex];
+    if (!scene) {
+      resetChromeColor();
+      return;
+    }
+
+    let cancelled = false;
+    void sampleTopColorFromUrl(sceneLqipUrl(scene.imagePath))
+      .then((hex) => {
+        if (!cancelled) applyChromeColor(hex);
+      })
+      .catch(() => {
+        if (!cancelled) resetChromeColor();
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [tab, scenes, sceneIndex]);
+
   return (
-    <div className="relative h-full min-h-dvh overflow-hidden bg-black text-white">
+    <div className="relative h-full min-h-dvh overflow-hidden bg-transparent text-white">
       {error != null ? (
         <div
           role="alert"
