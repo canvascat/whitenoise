@@ -36,7 +36,8 @@ export function App() {
       {error != null ? (
         <div
           role="alert"
-          className="fixed inset-x-0 top-0 z-50 flex items-start justify-between gap-3 bg-red-900/90 px-4 py-3 text-sm text-red-50 backdrop-blur-sm"
+          className="fixed inset-x-0 top-0 z-50 flex items-start justify-between gap-3 bg-red-900/90 px-4 pb-3 text-sm text-red-50 backdrop-blur-sm"
+          style={{ paddingTop: "calc(0.75rem + var(--safe-top))" }}
         >
           <p className="min-w-0 flex-1 break-words">{error}</p>
           <button

@@ -54,9 +54,28 @@ export default defineConfig({
             },
           },
           {
-            urlPattern: ({ url }) => /\/assets\/scene\/.*\.(jpg|json)$/.test(url.pathname),
+            urlPattern: ({ url }) =>
+              /\/assets\/scene\/.*\.(webp|jpg|jpeg|json)$/.test(url.pathname),
             handler: "CacheFirst",
-            options: { cacheName: "scene-cache" },
+            options: {
+              cacheName: "scene-cache",
+              expiration: {
+                maxEntries: 40,
+                maxAgeSeconds: 60 * 60 * 24 * 30,
+              },
+            },
+          },
+          {
+            urlPattern: ({ url }) =>
+              url.pathname.includes("/assets/icons/") && url.pathname.endsWith(".png"),
+            handler: "CacheFirst",
+            options: {
+              cacheName: "icon-cache",
+              expiration: {
+                maxEntries: 60,
+                maxAgeSeconds: 60 * 60 * 24 * 30,
+              },
+            },
           },
         ],
       },

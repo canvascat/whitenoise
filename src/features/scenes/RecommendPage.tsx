@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type PointerEvent } from "react";
 import { loadSceneList } from "../../data/loadConfig";
+import { sceneImageUrl, sceneLqipUrl } from "../../data/paths";
 import { playbackActions } from "../../store/playbackStore";
 import { usePlayback } from "../../store/usePlayback";
 import { TimerSheet, type TimerMinutes } from "../timer/TimerSheet";
@@ -42,6 +43,22 @@ export function RecommendPage() {
       cancelled = true;
     };
   }, []);
+
+  // Preload current + neighbors (hi-res + LQIP)
+  useEffect(() => {
+    if (scenes.length === 0) return;
+    const n = scenes.length;
+    const idxs = [sceneIndex, (sceneIndex + 1) % n, (sceneIndex - 1 + n) % n];
+    for (const i of idxs) {
+      const path = scenes[i]?.imagePath;
+      if (!path) continue;
+      const hi = new Image();
+      hi.decoding = "async";
+      hi.src = sceneImageUrl(path);
+      const lo = new Image();
+      lo.src = sceneLqipUrl(path);
+    }
+  }, [scenes, sceneIndex]);
 
   const scene = scenes[sceneIndex];
   const showPlayOverlay = !hasResumed && (status === "idle" || status === "stopped");
@@ -86,7 +103,14 @@ export function RecommendPage() {
           onPointerDown={handlePointerDown}
           onPointerUp={handlePointerUp}
         >
-          <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 flex items-end justify-between px-6 pb-14 pt-24">
+          <div
+            className="pointer-events-none absolute inset-x-0 bottom-0 z-10 flex items-end justify-between pt-24"
+            style={{
+              paddingBottom: "max(2.5rem, calc(1.25rem + var(--safe-bottom)))",
+              paddingLeft: "max(1.5rem, var(--safe-left))",
+              paddingRight: "max(1.5rem, var(--safe-right))",
+            }}
+          >
             <div className="max-w-[70%]">
               <h1 className="text-[2rem] font-semibold leading-tight text-white drop-shadow-[0_1px_4px_rgba(0,0,0,0.55)]">
                 {scene.title}

@@ -10,7 +10,15 @@ type TrackGridProps = {
 
 export function TrackGrid({ icons, active, onToggle }: TrackGridProps) {
   return (
-    <div className="grid grid-cols-3 gap-x-4 gap-y-7 px-6 pb-28 pt-20">
+    <div
+      className="grid grid-cols-3 gap-x-4 gap-y-7 px-6"
+      style={{
+        paddingTop: "calc(5rem + var(--safe-top))",
+        paddingBottom: "calc(7.5rem + var(--safe-bottom))",
+        paddingLeft: "max(1.5rem, var(--safe-left))",
+        paddingRight: "max(1.5rem, var(--safe-right))",
+      }}
+    >
       {icons.map((icon) => {
         const isActive = icon.audioName in active;
         return (
@@ -35,6 +43,8 @@ export function TrackGrid({ icons, active, onToggle }: TrackGridProps) {
                 alt=""
                 className="h-9 w-9 object-contain"
                 draggable={false}
+                loading="lazy"
+                decoding="async"
               />
             </span>
             <span className="text-[13px] leading-none text-white/90">{icon.title}</span>
