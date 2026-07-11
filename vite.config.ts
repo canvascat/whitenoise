@@ -62,11 +62,6 @@ export default defineConfig({
       },
     }),
   ],
-  run: {
-    tasks: {
-      build: "tsc && vp build",
-    },
-  },
   staged: {
     "*": "vp check --fix",
   },
