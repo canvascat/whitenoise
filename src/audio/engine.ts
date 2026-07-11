@@ -5,13 +5,27 @@ import { PointScheduler } from "./pointScheduler";
 
 export type EngineDeps = {
   createContext: () => AudioContext;
+  /** Decode-only context so playback AudioContext can be created inside a user gesture (iOS). */
+  createDecodeContext?: () => BaseAudioContext;
   fetchBuffer?: (url: string) => Promise<ArrayBuffer>;
   schedule?: (fn: () => void, ms: number) => ReturnType<typeof setTimeout>;
   clear?: (id: ReturnType<typeof setTimeout>) => void;
   random?: () => number;
+  /** iOS Safari: prefer playback session so the mute switch does not silence Web Audio. */
+  setAudioSessionType?: (type: "playback" | "transient" | "ambient") => void;
 };
 
 export type Status = "idle" | "loading" | "playing" | "paused" | "stopped";
+
+type PendingLine = {
+  name: string;
+  volume: number;
+  buffer: AudioBuffer;
+};
+
+type PendingPoint = {
+  config: PointTrackConfig;
+};
 
 type LoadedLine = {
   name: string;
@@ -26,29 +40,45 @@ type LoadedPoint = {
 
 export class AudioEngine {
   private readonly createContext: () => AudioContext;
+  private readonly createDecodeContext?: () => BaseAudioContext;
   private readonly fetchBuffer?: (url: string) => Promise<ArrayBuffer>;
   private readonly schedule: (fn: () => void, ms: number) => ReturnType<typeof setTimeout>;
   private readonly clear: (id: ReturnType<typeof setTimeout>) => void;
   private readonly random: () => number;
+  private readonly setAudioSessionType?: (type: "playback" | "transient" | "ambient") => void;
 
   private ctx: AudioContext | null = null;
+  private decodeCtx: BaseAudioContext | null = null;
   private cache = new Map<string, AudioBuffer>();
+  private pendingLines: PendingLine[] = [];
+  private pendingPoints: PendingPoint[] = [];
   private lines: LoadedLine[] = [];
   private points: LoadedPoint[] = [];
   private oneShotSources: AudioBufferSourceNode[] = [];
   private generation = 0;
   private _status: Status = "idle";
+  private unlocked = false;
 
   constructor(deps: EngineDeps) {
     this.createContext = deps.createContext;
+    this.createDecodeContext = deps.createDecodeContext;
     this.fetchBuffer = deps.fetchBuffer;
     this.schedule = deps.schedule ?? ((fn, ms) => setTimeout(fn, ms));
     this.clear = deps.clear ?? ((id) => clearTimeout(id as ReturnType<typeof setTimeout>));
     this.random = deps.random ?? Math.random;
+    this.setAudioSessionType = deps.setAudioSessionType;
   }
 
   get status(): Status {
     return this._status;
+  }
+
+  private ensureDecodeContext(): BaseAudioContext {
+    if (this.ctx) return this.ctx;
+    if (!this.decodeCtx) {
+      this.decodeCtx = this.createDecodeContext?.() ?? new OfflineAudioContext(2, 1, 48000);
+    }
+    return this.decodeCtx;
   }
 
   private ensureContext(): AudioContext {
@@ -62,20 +92,20 @@ export class AudioEngine {
     const shouldResume = this._status === "playing";
     const gen = ++this.generation;
     this._status = "loading";
-    const ctx = this.ensureContext();
+    const decodeCtx = this.ensureDecodeContext();
 
-    const nextLines: LoadedLine[] = [];
-    const nextPoints: LoadedPoint[] = [];
+    const nextLines: PendingLine[] = [];
+    const nextPoints: PendingPoint[] = [];
 
     for (const track of tracks) {
       if (gen !== this.generation) return;
       try {
         if (track.kind === "line") {
-          const loaded = await this.loadLine(ctx, track);
+          const loaded = await this.loadLineBuffer(decodeCtx, track);
           if (gen !== this.generation) return;
           if (loaded) nextLines.push(loaded);
         } else {
-          const loaded = await this.loadPoint(ctx, track);
+          const loaded = await this.loadPointPending(decodeCtx, track);
           if (gen !== this.generation) return;
           if (loaded) nextPoints.push(loaded);
         }
@@ -87,8 +117,10 @@ export class AudioEngine {
     if (gen !== this.generation) return;
 
     this.teardownPlayback();
-    this.lines = nextLines;
-    this.points = nextPoints;
+    this.pendingLines = nextLines;
+    this.pendingPoints = nextPoints;
+    this.lines = [];
+    this.points = [];
 
     if (shouldResume) {
       this.play();
@@ -97,35 +129,77 @@ export class AudioEngine {
     }
   }
 
-  private async loadLine(ctx: AudioContext, track: LineTrackConfig): Promise<LoadedLine | null> {
+  private async loadLineBuffer(
+    ctx: BaseAudioContext,
+    track: LineTrackConfig,
+  ): Promise<PendingLine | null> {
     try {
       const buffer = await fetchAndDecode(ctx, track.name, this.cache, this.fetchBuffer);
-      return { name: track.name, track: new LineTrack(ctx, buffer, track.volume) };
+      return { name: track.name, volume: track.volume, buffer };
     } catch {
       return null;
     }
   }
 
-  private async loadPoint(ctx: AudioContext, track: PointTrackConfig): Promise<LoadedPoint | null> {
+  private async loadPointPending(
+    ctx: BaseAudioContext,
+    track: PointTrackConfig,
+  ): Promise<PendingPoint | null> {
     try {
       for (const name of track.variants) {
         await fetchAndDecode(ctx, name, this.cache, this.fetchBuffer);
       }
-      const gain = ctx.createGain();
-      gain.gain.value = track.volume;
-      gain.connect(ctx.destination);
-      return { config: track, scheduler: null, gain };
+      return { config: track };
     } catch {
       return null;
     }
   }
 
+  private materialize(ctx: AudioContext): void {
+    this.teardownPlayback();
+    this.lines = this.pendingLines.map((line) => ({
+      name: line.name,
+      track: new LineTrack(ctx, line.buffer, line.volume),
+    }));
+    this.points = this.pendingPoints.map((point) => {
+      const gain = ctx.createGain();
+      gain.gain.value = point.config.volume;
+      gain.connect(ctx.destination);
+      return { config: point.config, scheduler: null, gain };
+    });
+  }
+
   async resume(): Promise<void> {
+    // Must create/resume synchronously within the user-gesture call stack (iOS).
     const ctx = this.ensureContext();
-    await ctx.resume();
+    this.setAudioSessionType?.("playback");
+    if (ctx.state === "suspended") {
+      await ctx.resume();
+    }
+    this.unlock(ctx);
+  }
+
+  private unlock(ctx: AudioContext): void {
+    if (this.unlocked) return;
+    try {
+      const buffer = ctx.createBuffer(1, 1, ctx.sampleRate || 48000);
+      const source = ctx.createBufferSource();
+      source.buffer = buffer;
+      source.connect(ctx.destination);
+      source.start(0);
+      this.unlocked = true;
+    } catch {
+      /* unlock best-effort */
+    }
   }
 
   play(): void {
+    const ctx = this.ensureContext();
+    // Nodes live on the playback context; rebuild after load/stop or first play.
+    if (this.lines.length === 0) {
+      this.materialize(ctx);
+    }
+
     for (const line of this.lines) {
       line.track.start();
     }
@@ -179,6 +253,8 @@ export class AudioEngine {
 
   stop(): void {
     this.teardownPlayback();
+    this.lines = [];
+    this.points = [];
     this._status = "stopped";
   }
 
@@ -189,6 +265,11 @@ export class AudioEngine {
     for (const point of this.points) {
       point.scheduler?.stop();
       point.scheduler = null;
+      try {
+        point.gain.disconnect();
+      } catch {
+        /* mock */
+      }
     }
     this.stopOneShots();
   }

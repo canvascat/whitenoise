@@ -5,27 +5,27 @@ function withBase(path: string): string {
 }
 
 export function audioUrl(name: string): string {
-  return withBase(`assets/audio/${name}.mp3`);
+  return withBase(`assets/audio/${encodeURIComponent(name)}.mp3`);
 }
 
 /** Prefer WebP scene art; accept legacy .jpg paths from config. */
 export function sceneImageUrl(imagePath: string): string {
   const file = imagePath.replace(/\.jpe?g$/i, ".webp");
-  return withBase(`assets/scene/${file}`);
+  return withBase(`assets/scene/${encodeURIComponent(file)}`);
 }
 
 /** Tiny blur placeholder for progressive scene paint. */
 export function sceneLqipUrl(imagePath: string): string {
   const stem = imagePath.replace(/\.(jpe?g|webp)$/i, "");
-  return withBase(`assets/scene/lqip/${stem}.webp`);
+  return withBase(`assets/scene/lqip/${encodeURIComponent(stem)}.webp`);
 }
 
 export function iconUrl(icon: string): string {
-  return withBase(`assets/icons/${icon}`);
+  return withBase(`assets/icons/${encodeURIComponent(icon)}`);
 }
 
 export function sceneTracksUrl(title: string): string {
-  return withBase(`assets/scene/${title}.json`);
+  return withBase(`assets/scene/${encodeURIComponent(title)}.json`);
 }
 
 export function assetUrl(path: string): string {

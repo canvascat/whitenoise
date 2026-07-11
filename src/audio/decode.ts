@@ -1,7 +1,7 @@
 import { audioUrl } from "../data/paths";
 
 export async function fetchAndDecode(
-  ctx: AudioContext,
+  ctx: BaseAudioContext,
   name: string,
   cache: Map<string, AudioBuffer>,
   fetchBuffer?: (url: string) => Promise<ArrayBuffer>,

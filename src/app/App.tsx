@@ -31,6 +31,17 @@ export function App() {
     return () => window.clearTimeout(id);
   }, [error]);
 
+  // iOS may suspend AudioContext when backgrounded; resume on return if still playing.
+  useEffect(() => {
+    const onVisible = () => {
+      if (document.visibilityState !== "visible") return;
+      if (status !== "playing") return;
+      void playbackActions.play();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => document.removeEventListener("visibilitychange", onVisible);
+  }, [status]);
+
   return (
     <div className="relative h-full min-h-dvh overflow-hidden bg-black text-white">
       {error != null ? (

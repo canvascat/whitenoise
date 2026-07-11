@@ -51,7 +51,7 @@ export async function loadSceneList(): Promise<SceneMeta[]> {
 }
 
 export async function loadSceneTracks(title: string): Promise<TrackConfig[]> {
-  const res = await fetch(sceneTracksUrl(encodeURIComponent(title)));
+  const res = await fetch(sceneTracksUrl(title));
   if (!res.ok) throw new Error(`scene tracks missing: ${title}`);
   const raw = await res.json();
   return parseSceneTracks(raw);
