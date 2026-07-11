@@ -26,6 +26,13 @@ export class LineTrack {
     this.gain.gain.value = v;
   }
 
+  fadeTo(volume: number, durationSec: number) {
+    const now = this.ctx.currentTime;
+    const param = this.gain.gain;
+    param.setValueAtTime(param.value, now);
+    param.linearRampToValueAtTime(volume, now + durationSec);
+  }
+
   stop() {
     if (!this.source) return;
     try {

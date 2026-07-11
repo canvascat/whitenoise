@@ -46,4 +46,13 @@ describe("LineTrack", () => {
     track.stop();
     expect(ctx._source.stop).toHaveBeenCalledTimes(1);
   });
+
+  it("fadeTo schedules linear ramp from current volume", () => {
+    const ctx = mockCtx();
+    (ctx as { currentTime: number }).currentTime = 1.5;
+    const track = new LineTrack(ctx, { duration: 1 } as AudioBuffer, 0.8);
+    track.fadeTo(0, 0.5);
+    expect(ctx._gain.gain.setValueAtTime).toHaveBeenCalledWith(0.8, 1.5);
+    expect(ctx._gain.gain.linearRampToValueAtTime).toHaveBeenCalledWith(0, 2);
+  });
 });

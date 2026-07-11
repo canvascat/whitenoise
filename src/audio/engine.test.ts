@@ -139,6 +139,8 @@ describe("AudioEngine", () => {
     await engine.loadScene([{ kind: "line", name: "河流", volume: 0.5 }]);
     engine.play();
     await engine.fadeOutAndStop(10);
+    expect(ctx._gain.gain.setValueAtTime).toHaveBeenCalled();
+    expect(ctx._gain.gain.linearRampToValueAtTime).toHaveBeenCalledWith(0, 0.01);
     expect(engine.status).toBe("stopped");
   });
 

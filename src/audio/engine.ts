@@ -221,7 +221,7 @@ export class AudioEngine {
     const end = now + ms / 1000;
 
     for (const line of this.lines) {
-      line.track.setVolume(0);
+      line.track.fadeTo(0, ms / 1000);
     }
     for (const point of this.points) {
       try {
