@@ -1,14 +1,54 @@
+import { useEffect } from "react";
 import { CustomPage } from "../features/mixer/CustomPage";
 import { RecommendPage } from "../features/scenes/RecommendPage";
 import { TopTabs } from "../features/scenes/TopTabs";
+import { updateMediaSession } from "../lib/mediaSession";
 import { playbackActions } from "../store/playbackStore";
 import { usePlayback } from "../store/usePlayback";
 
 export function App() {
-  const { tab } = usePlayback();
+  const { tab, scenes, sceneIndex, status, error } = usePlayback();
+
+  useEffect(() => {
+    const scene = scenes[sceneIndex];
+    updateMediaSession({
+      title: scene?.title ?? "白噪声",
+      playing: status === "playing",
+      onPlay: () => {
+        void playbackActions.play();
+      },
+      onPause: () => {
+        playbackActions.pause();
+      },
+    });
+  }, [scenes, sceneIndex, status]);
+
+  useEffect(() => {
+    if (error == null) return;
+    const id = window.setTimeout(() => {
+      playbackActions.clearError();
+    }, 5000);
+    return () => window.clearTimeout(id);
+  }, [error]);
 
   return (
     <div className="relative h-full min-h-dvh overflow-hidden bg-black text-white">
+      {error != null ? (
+        <div
+          role="alert"
+          className="fixed inset-x-0 top-0 z-50 flex items-start justify-between gap-3 bg-red-900/90 px-4 py-3 text-sm text-red-50 backdrop-blur-sm"
+        >
+          <p className="min-w-0 flex-1 break-words">{error}</p>
+          <button
+            type="button"
+            className="shrink-0 rounded px-2 py-0.5 text-red-100/80 hover:bg-white/10 hover:text-white"
+            onClick={() => playbackActions.clearError()}
+            aria-label="关闭错误提示"
+          >
+            关闭
+          </button>
+        </div>
+      ) : null}
       <TopTabs tab={tab} onTabChange={(next) => playbackActions.setTab(next)} />
       {tab === "recommend" ? <RecommendPage /> : <CustomPage />}
     </div>
