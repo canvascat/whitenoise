@@ -11,3 +11,25 @@ body {
   color: #fff;
   font-family: "PingFang SC", "Noto Sans SC", system-ui, sans-serif;
 }
+
+@keyframes scene-breath-pulse {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.035);
+  }
+}
+
+.scene-breath {
+  animation: scene-breath-pulse 8s ease-in-out infinite;
+  transform-origin: center center;
+  will-change: transform;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .scene-breath {
+    animation: none;
+  }
+}

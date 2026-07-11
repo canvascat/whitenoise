@@ -7,10 +7,23 @@ import { SceneStage } from "./SceneStage";
 const SWIPE_THRESHOLD = 50;
 
 export function RecommendPage() {
-  const { scenes, sceneIndex, status } = usePlayback();
+  const { scenes, sceneIndex, status, reducedMotion } = usePlayback();
   const [timerOpen, setTimerOpen] = useState(false);
   const [hasResumed, setHasResumed] = useState(false);
+  const [systemReducedMotion, setSystemReducedMotion] = useState(() =>
+    typeof window !== "undefined"
+      ? window.matchMedia("(prefers-reduced-motion: reduce)").matches
+      : false,
+  );
   const pointerStartX = useRef<number | null>(null);
+
+  useEffect(() => {
+    const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const onChange = () => setSystemReducedMotion(mq.matches);
+    onChange();
+    mq.addEventListener("change", onChange);
+    return () => mq.removeEventListener("change", onChange);
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -61,7 +74,9 @@ export function RecommendPage() {
     <div className="relative h-full min-h-dvh overflow-hidden">
       {scene ? (
         <SceneStage
+          title={scene.title}
           imagePath={scene.imagePath}
+          reducedMotion={reducedMotion || systemReducedMotion}
           onPointerDown={handlePointerDown}
           onPointerUp={handlePointerUp}
         >
