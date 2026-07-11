@@ -8,7 +8,7 @@ export type PlaybackState = {
   scenes: SceneMeta[];
   sceneIndex: number;
   status: "idle" | "loading" | "playing" | "paused" | "stopped";
-  /** 自选：title -> volume；缺省表示未选中 */
+  /** 自选：audioName（文件 stem）-> volume；缺省表示未选中 */
   customActive: Record<string, number>;
   timerMinutes: 0 | 15 | 30 | 60;
   timerEndsAt: number | null;
@@ -135,8 +135,35 @@ export function createPlaybackController(
   }
 
   const actions = {
-    setTab(tab: PlaybackState["tab"]) {
+    async setTab(tab: PlaybackState["tab"]) {
+      const prevTab = store.state.tab;
       store.setState((s) => ({ ...s, tab }));
+      if (prevTab === tab) return;
+
+      if (tab === "recommend") {
+        if (store.state.scenes.length > 0) {
+          await actions.selectScene(store.state.sceneIndex);
+        }
+        return;
+      }
+
+      const { customActive, status } = store.state;
+      if (Object.keys(customActive).length === 0) return;
+
+      const wasPlaying = status === "playing";
+      try {
+        await engine.loadScene(customActiveToLineTracks(customActive));
+        if (wasPlaying) {
+          await engine.resume();
+          engine.play();
+          store.setState((s) => ({ ...s, status: "playing", error: null }));
+        } else {
+          store.setState((s) => ({ ...s, status: engine.status, error: null }));
+        }
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        store.setState((s) => ({ ...s, error: message }));
+      }
     },
 
     setScenes(scenes: SceneMeta[]) {
@@ -168,20 +195,20 @@ export function createPlaybackController(
       }
     },
 
-    async toggleCustom(title: string, defaultVolume: number) {
+    async toggleCustom(audioName: string, defaultVolume: number) {
       const prev = store.state.customActive;
       const next = { ...prev };
-      if (title in next) {
-        delete next[title];
+      if (audioName in next) {
+        delete next[audioName];
       } else {
-        next[title] = defaultVolume;
+        next[audioName] = defaultVolume;
       }
 
       // 先更新 UI 选中态；加载失败时保留选中并写入 error，不回滚 customActive
       store.setState((s) => ({ ...s, customActive: next, error: null }));
 
       try {
-        // stub：用 customActive 键名作为线声轨名加载
+        // 用 audioName（文件 stem）作为线声轨名加载
         await engine.loadScene(customActiveToLineTracks(next));
         store.setState((s) => ({ ...s, status: engine.status }));
       } catch (err) {

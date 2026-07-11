@@ -37,10 +37,54 @@ describe("playbackStore", () => {
     vi.useRealTimers();
   });
 
-  it("setTab updates state", () => {
+  it("setTab updates state", async () => {
     const { store, actions } = createPlaybackController(mockEngine());
-    actions.setTab("custom");
+    await actions.setTab("custom");
     expect(store.state.tab).toBe("custom");
+  });
+
+  it("setTab to recommend reloads current scene tracks", async () => {
+    const tracks: TrackConfig[] = [{ kind: "line", name: "雨", volume: 0.8 }];
+    const loadTracks = vi.fn(async () => tracks);
+    const engine = mockEngine({ status: "stopped" });
+    const { actions } = createPlaybackController(engine, {
+      loadTracks,
+      initialState: { scenes, sceneIndex: 0, tab: "custom" },
+    });
+
+    await actions.setTab("recommend");
+
+    expect(loadTracks).toHaveBeenCalledWith("夏雨");
+    expect(engine.loadScene).toHaveBeenCalledWith(tracks);
+  });
+
+  it("setTab to custom reloads customActive tracks and restores play", async () => {
+    const engine = mockEngine({ status: "playing" });
+    const { store, actions } = createPlaybackController(engine, {
+      initialState: {
+        tab: "recommend",
+        status: "playing",
+        customActive: { river: 0.5 },
+      },
+    });
+
+    await actions.setTab("custom");
+
+    expect(engine.loadScene).toHaveBeenCalledWith([{ kind: "line", name: "river", volume: 0.5 }]);
+    expect(engine.resume).toHaveBeenCalled();
+    expect(engine.play).toHaveBeenCalled();
+    expect(store.state.status).toBe("playing");
+  });
+
+  it("setTab to custom with empty customActive does not loadScene", async () => {
+    const engine = mockEngine();
+    const { actions } = createPlaybackController(engine, {
+      initialState: { tab: "recommend", customActive: {} },
+    });
+
+    await actions.setTab("custom");
+
+    expect(engine.loadScene).not.toHaveBeenCalled();
   });
 
   it("play calls resume+play and sets playing", async () => {
@@ -132,15 +176,15 @@ describe("playbackStore", () => {
     actions.dispose();
   });
 
-  it("toggleCustom adds then removes key", async () => {
+  it("toggleCustom keys by audioName not title", async () => {
     const engine = mockEngine({ status: "stopped" });
     const { store, actions } = createPlaybackController(engine);
 
-    await actions.toggleCustom("河流", 0.6);
-    expect(store.state.customActive).toEqual({ 河流: 0.6 });
-    expect(engine.loadScene).toHaveBeenCalledWith([{ kind: "line", name: "河流", volume: 0.6 }]);
+    await actions.toggleCustom("river", 0.6);
+    expect(store.state.customActive).toEqual({ river: 0.6 });
+    expect(engine.loadScene).toHaveBeenCalledWith([{ kind: "line", name: "river", volume: 0.6 }]);
 
-    await actions.toggleCustom("河流", 0.6);
+    await actions.toggleCustom("river", 0.6);
     expect(store.state.customActive).toEqual({});
     expect(engine.loadScene).toHaveBeenLastCalledWith([]);
   });

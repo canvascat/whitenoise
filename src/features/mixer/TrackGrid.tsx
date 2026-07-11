@@ -3,6 +3,7 @@ import { iconUrl } from "../../data/paths";
 
 type TrackGridProps = {
   icons: IconConfig[];
+  /** keys = audioName */
   active: Record<string, number>;
   onToggle: (icon: IconConfig) => void;
 };
@@ -11,10 +12,10 @@ export function TrackGrid({ icons, active, onToggle }: TrackGridProps) {
   return (
     <div className="grid grid-cols-3 gap-x-4 gap-y-7 px-6 pb-28 pt-20">
       {icons.map((icon) => {
-        const isActive = icon.title in active;
+        const isActive = icon.audioName in active;
         return (
           <button
-            key={icon.title}
+            key={icon.audioName}
             type="button"
             className="flex flex-col items-center gap-2.5"
             onClick={() => onToggle(icon)}

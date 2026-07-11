@@ -49,7 +49,7 @@ export function App() {
           </button>
         </div>
       ) : null}
-      <TopTabs tab={tab} onTabChange={(next) => playbackActions.setTab(next)} />
+      <TopTabs tab={tab} onTabChange={(next) => void playbackActions.setTab(next)} />
       {tab === "recommend" ? <RecommendPage /> : <CustomPage />}
     </div>
   );

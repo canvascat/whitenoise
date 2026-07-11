@@ -25,10 +25,12 @@ export function CustomPage() {
     };
   }, []);
 
-  const activeTitles = Object.keys(customActive);
+  const activeTitles = icons
+    .filter((icon) => icon.audioName in customActive)
+    .map((icon) => icon.title);
 
   function handleToggle(icon: IconConfig) {
-    void playbackActions.toggleCustom(icon.title, icon.volume);
+    void playbackActions.toggleCustom(icon.audioName, icon.volume);
   }
 
   function handlePlayPause() {
