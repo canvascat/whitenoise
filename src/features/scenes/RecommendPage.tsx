@@ -2,12 +2,13 @@ import { useEffect, useRef, useState, type PointerEvent } from "react";
 import { loadSceneList } from "../../data/loadConfig";
 import { playbackActions } from "../../store/playbackStore";
 import { usePlayback } from "../../store/usePlayback";
+import { TimerSheet, type TimerMinutes } from "../timer/TimerSheet";
 import { SceneStage } from "./SceneStage";
 
 const SWIPE_THRESHOLD = 50;
 
 export function RecommendPage() {
-  const { scenes, sceneIndex, status, reducedMotion } = usePlayback();
+  const { scenes, sceneIndex, status, reducedMotion, timerMinutes } = usePlayback();
   const [timerOpen, setTimerOpen] = useState(false);
   const [hasResumed, setHasResumed] = useState(false);
   const [systemReducedMotion, setSystemReducedMotion] = useState(() =>
@@ -70,6 +71,11 @@ export function RecommendPage() {
     setHasResumed(true);
   }
 
+  function handleTimerSelect(minutes: TimerMinutes) {
+    playbackActions.setTimer(minutes);
+    setTimerOpen(false);
+  }
+
   return (
     <div className="relative h-full min-h-dvh overflow-hidden">
       {scene ? (
@@ -120,20 +126,12 @@ export function RecommendPage() {
         </div>
       ) : null}
 
-      {timerOpen ? (
-        <div className="fixed inset-0 z-40 flex items-end justify-center bg-black/40">
-          <div className="mb-8 w-[min(100%,20rem)] rounded-2xl bg-[#1e1e1e] px-6 py-5 text-center text-white shadow-lg">
-            <p className="text-lg">定时</p>
-            <button
-              type="button"
-              className="mt-4 text-sm text-white/60"
-              onClick={() => setTimerOpen(false)}
-            >
-              关闭
-            </button>
-          </div>
-        </div>
-      ) : null}
+      <TimerSheet
+        open={timerOpen}
+        selected={timerMinutes}
+        onSelect={handleTimerSelect}
+        onClose={() => setTimerOpen(false)}
+      />
     </div>
   );
 }

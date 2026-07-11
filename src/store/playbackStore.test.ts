@@ -1,5 +1,5 @@
-import { describe, expect, it, vi } from "vite-plus/test";
-import { createPlaybackController, type PlaybackEngine } from "./playbackStore";
+import { afterEach, describe, expect, it, vi } from "vite-plus/test";
+import { checkTimer, createPlaybackController, type PlaybackEngine } from "./playbackStore";
 import type { SceneMeta, TrackConfig } from "../data/types";
 
 function mockEngine(overrides: Partial<PlaybackEngine> = {}): PlaybackEngine {
@@ -10,6 +10,7 @@ function mockEngine(overrides: Partial<PlaybackEngine> = {}): PlaybackEngine {
     pause: vi.fn(),
     stop: vi.fn(),
     loadScene: vi.fn(async () => {}),
+    fadeOutAndStop: vi.fn(async () => {}),
     ...overrides,
   };
 }
@@ -32,6 +33,10 @@ const scenes: SceneMeta[] = [
 ];
 
 describe("playbackStore", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   it("setTab updates state", () => {
     const { store, actions } = createPlaybackController(mockEngine());
     actions.setTab("custom");
@@ -72,6 +77,59 @@ describe("playbackStore", () => {
     actions.setTimer(0);
     expect(store.state.timerMinutes).toBe(0);
     expect(store.state.timerEndsAt).toBeNull();
+    actions.dispose();
+  });
+
+  it("pause and stop clear active timer", async () => {
+    const engine = mockEngine();
+    const { store, actions } = createPlaybackController(engine);
+
+    actions.setTimer(30);
+    expect(store.state.timerEndsAt).not.toBeNull();
+    actions.pause();
+    expect(store.state.timerMinutes).toBe(0);
+    expect(store.state.timerEndsAt).toBeNull();
+
+    actions.setTimer(15);
+    actions.stop();
+    expect(store.state.timerMinutes).toBe(0);
+    expect(store.state.timerEndsAt).toBeNull();
+    expect(store.state.status).toBe("stopped");
+    actions.dispose();
+  });
+
+  it("checkTimer calls fadeOutAndStop when now >= timerEndsAt", async () => {
+    const engine = mockEngine();
+    const endsAt = 1_000_000;
+
+    expect(await checkTimer(endsAt - 1, endsAt, engine)).toBe(false);
+    expect(engine.fadeOutAndStop).not.toHaveBeenCalled();
+
+    expect(await checkTimer(endsAt, endsAt, engine, 2000)).toBe(true);
+    expect(engine.fadeOutAndStop).toHaveBeenCalledWith(2000);
+  });
+
+  it("timer expiry via fake timers calls fadeOutAndStop and clears timer", async () => {
+    vi.useFakeTimers();
+    const engine = mockEngine();
+    const start = 1_700_000_000_000;
+    let now = start;
+    const { store, actions } = createPlaybackController(engine, {
+      now: () => now,
+      timerIntervalMs: 1000,
+    });
+
+    actions.setTimer(15);
+    expect(store.state.timerEndsAt).toBe(start + 15 * 60_000);
+
+    now = start + 15 * 60_000;
+    await vi.advanceTimersByTimeAsync(1000);
+
+    expect(engine.fadeOutAndStop).toHaveBeenCalledWith(1500);
+    expect(store.state.timerMinutes).toBe(0);
+    expect(store.state.timerEndsAt).toBeNull();
+    expect(store.state.status).toBe("paused");
+    actions.dispose();
   });
 
   it("toggleCustom adds then removes key", async () => {

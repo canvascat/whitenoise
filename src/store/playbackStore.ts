@@ -18,12 +18,21 @@ export type PlaybackState = {
 
 export type PlaybackEngine = Pick<
   AudioEngine,
-  "resume" | "play" | "pause" | "stop" | "loadScene" | "status"
+  "resume" | "play" | "pause" | "stop" | "loadScene" | "status" | "fadeOutAndStop"
 >;
 
 export type PlaybackControllerOptions = {
   loadTracks?: (title: string) => Promise<TrackConfig[]>;
   initialState?: Partial<PlaybackState>;
+  /** 定时检查间隔（毫秒），默认 1000；测试可注入更短间隔 */
+  timerIntervalMs?: number;
+  /** 到时淡出时长（毫秒） */
+  fadeOutMs?: number;
+  /** 可注入 now，便于单测 */
+  now?: () => number;
+  /** 可注入调度器，便于 fake timers */
+  setIntervalFn?: typeof setInterval;
+  clearIntervalFn?: typeof clearInterval;
 };
 
 export const initialPlaybackState: PlaybackState = {
@@ -38,6 +47,23 @@ export const initialPlaybackState: PlaybackState = {
   reducedMotion: false,
 };
 
+const DEFAULT_FADE_OUT_MS = 1500;
+
+/**
+ * 纯检查：若 now >= timerEndsAt 则调用 fadeOutAndStop。
+ * 返回是否已触发到时逻辑（调用方负责清 timer / 更新 status）。
+ */
+export async function checkTimer(
+  now: number,
+  timerEndsAt: number | null,
+  engine: Pick<PlaybackEngine, "fadeOutAndStop">,
+  fadeOutMs: number = DEFAULT_FADE_OUT_MS,
+): Promise<boolean> {
+  if (timerEndsAt == null || now < timerEndsAt) return false;
+  await engine.fadeOutAndStop(fadeOutMs);
+  return true;
+}
+
 function customActiveToLineTracks(customActive: Record<string, number>): TrackConfig[] {
   return Object.entries(customActive).map(([name, volume]) => ({
     kind: "line" as const,
@@ -51,10 +77,62 @@ export function createPlaybackController(
   options: PlaybackControllerOptions = {},
 ) {
   const loadTracks = options.loadTracks ?? loadSceneTracks;
+  const getNow = options.now ?? Date.now;
+  const fadeOutMs = options.fadeOutMs ?? DEFAULT_FADE_OUT_MS;
+  const timerIntervalMs = options.timerIntervalMs ?? 1000;
+  const setIntervalFn = options.setIntervalFn ?? setInterval;
+  const clearIntervalFn = options.clearIntervalFn ?? clearInterval;
+
   const store = new Store<PlaybackState>({
     ...initialPlaybackState,
     ...options.initialState,
   });
+
+  let timerHandle: ReturnType<typeof setInterval> | null = null;
+  let ticking = false;
+
+  function clearTimerFields(extra: Partial<PlaybackState> = {}) {
+    store.setState((s) => ({
+      ...s,
+      ...extra,
+      timerMinutes: 0,
+      timerEndsAt: null,
+    }));
+  }
+
+  function stopTimerWatch() {
+    if (timerHandle != null) {
+      clearIntervalFn(timerHandle);
+      timerHandle = null;
+    }
+  }
+
+  async function onTimerTick() {
+    if (ticking) return;
+    const endsAt = store.state.timerEndsAt;
+    if (endsAt == null) {
+      stopTimerWatch();
+      return;
+    }
+
+    ticking = true;
+    try {
+      const fired = await checkTimer(getNow(), endsAt, engine, fadeOutMs);
+      if (fired) {
+        stopTimerWatch();
+        clearTimerFields({ status: "paused" });
+      }
+    } finally {
+      ticking = false;
+    }
+  }
+
+  function startTimerWatch() {
+    if (timerHandle != null) return;
+    timerHandle = setIntervalFn(() => {
+      void onTimerTick();
+    }, timerIntervalMs);
+  }
 
   const actions = {
     setTab(tab: PlaybackState["tab"]) {
@@ -123,24 +201,42 @@ export function createPlaybackController(
 
     pause() {
       engine.pause();
-      store.setState((s) => ({ ...s, status: "paused" }));
+      stopTimerWatch();
+      clearTimerFields({ status: "paused" });
     },
 
     stop() {
       engine.stop();
-      store.setState((s) => ({
-        ...s,
-        status: "stopped",
-        timerEndsAt: null,
-      }));
+      stopTimerWatch();
+      clearTimerFields({ status: "stopped" });
     },
 
     setTimer(minutes: 0 | 15 | 30 | 60) {
+      if (minutes === 0) {
+        stopTimerWatch();
+        store.setState((s) => ({
+          ...s,
+          timerMinutes: 0,
+          timerEndsAt: null,
+        }));
+        return;
+      }
+
       store.setState((s) => ({
         ...s,
         timerMinutes: minutes,
-        timerEndsAt: minutes === 0 ? null : Date.now() + minutes * 60_000,
+        timerEndsAt: getNow() + minutes * 60_000,
       }));
+      startTimerWatch();
+    },
+
+    /** 供测试：手动推进一次定时检查 */
+    async tickTimer() {
+      await onTimerTick();
+    },
+
+    dispose() {
+      stopTimerWatch();
     },
 
     clearError() {
