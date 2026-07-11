@@ -1,5 +1,5 @@
-import { useEffect, useRef, type PointerEvent, type ReactNode } from "react";
-import { sceneImageUrl } from "../../data/paths";
+import { useEffect, useRef, useState, type PointerEvent, type ReactNode } from "react";
+import { sceneImageUrl, sceneLqipUrl } from "../../data/paths";
 import { startBreath, type EffectHandle } from "./effects/breath";
 import { startFireplace } from "./effects/fireplace";
 import { startRain } from "./effects/rain";
@@ -34,6 +34,13 @@ export function SceneStage({
   onPointerUp,
 }: SceneStageProps) {
   const effectsRef = useRef<HTMLDivElement>(null);
+  const [hiResReady, setHiResReady] = useState(false);
+  const src = sceneImageUrl(imagePath);
+  const lqip = sceneLqipUrl(imagePath);
+
+  useEffect(() => {
+    setHiResReady(false);
+  }, [src]);
 
   useEffect(() => {
     const layer = effectsRef.current;
@@ -57,10 +64,24 @@ export function SceneStage({
       onPointerDown={onPointerDown}
       onPointerUp={onPointerUp}
     >
+      {/* LQIP blur placeholder — tiny WebP, instant paint */}
       <div
+        data-scene-lqip
+        className="absolute inset-0 scale-110 bg-cover bg-center bg-no-repeat blur-xl"
+        style={{ backgroundImage: `url(${lqip})` }}
+        aria-hidden
+      />
+      <img
         data-scene-bg
-        className="absolute inset-0 bg-cover bg-center bg-no-repeat"
-        style={{ backgroundImage: `url(${sceneImageUrl(imagePath)})` }}
+        src={src}
+        alt=""
+        decoding="async"
+        fetchPriority="high"
+        draggable={false}
+        onLoad={() => setHiResReady(true)}
+        className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-300 ${
+          hiResReady ? "opacity-100" : "opacity-0"
+        }`}
       />
       <div ref={effectsRef} className="pointer-events-none absolute inset-0" data-effects-layer />
       {children}
