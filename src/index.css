@@ -19,6 +19,8 @@ body {
   font-family: "PingFang SC", "Noto Sans SC", system-ui, sans-serif;
   /* Avoid rubber-band overscroll revealing white edges on iOS */
   overscroll-behavior: none;
+  /* Smooth status-bar / overscroll tint when scene chrome color changes */
+  transition: background-color 280ms ease;
 }
 
 @keyframes scene-breath-pulse {
