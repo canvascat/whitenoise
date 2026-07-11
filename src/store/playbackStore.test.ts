@@ -49,6 +49,17 @@ describe("playbackStore", () => {
     expect(store.state.status).toBe("playing");
   });
 
+  it("pause after play calls engine.pause and sets paused", async () => {
+    const engine = mockEngine();
+    const { store, actions } = createPlaybackController(engine);
+
+    await actions.play();
+    actions.pause();
+
+    expect(engine.pause).toHaveBeenCalled();
+    expect(store.state.status).toBe("paused");
+  });
+
   it("setTimer(15) sets timerEndsAt roughly now+15min; setTimer(0) clears", () => {
     const { store, actions } = createPlaybackController(mockEngine());
     const before = Date.now();

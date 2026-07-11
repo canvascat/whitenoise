@@ -99,11 +99,20 @@ export function createPlaybackController(
         next[title] = defaultVolume;
       }
 
-      store.setState((s) => ({ ...s, customActive: next }));
+      // 先更新 UI 选中态；加载失败时保留选中并写入 error，不回滚 customActive
+      store.setState((s) => ({ ...s, customActive: next, error: null }));
 
-      // stub：用 customActive 键名作为线声轨名加载
-      await engine.loadScene(customActiveToLineTracks(next));
-      store.setState((s) => ({ ...s, status: engine.status }));
+      try {
+        // stub：用 customActive 键名作为线声轨名加载
+        await engine.loadScene(customActiveToLineTracks(next));
+        store.setState((s) => ({ ...s, status: engine.status }));
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        store.setState((s) => ({
+          ...s,
+          error: message,
+        }));
+      }
     },
 
     async play() {
