@@ -1,4 +1,5 @@
 import type { IconConfig, SceneMeta, TrackConfig } from "./types";
+import { assetUrl, sceneTracksUrl } from "./paths";
 
 function stripArgb(hex: string): string {
   const h = hex.trim();
@@ -44,20 +45,20 @@ export function parseSceneTracks(raw: RawSceneTrack[]): TrackConfig[] {
 }
 
 export async function loadSceneList(): Promise<SceneMeta[]> {
-  const res = await fetch("/assets/prebuilt_scene_config.json");
+  const res = await fetch(assetUrl("assets/prebuilt_scene_config.json"));
   if (!res.ok) throw new Error("scene config missing");
   return res.json();
 }
 
 export async function loadSceneTracks(title: string): Promise<TrackConfig[]> {
-  const res = await fetch(`/assets/scene/${encodeURIComponent(title)}.json`);
+  const res = await fetch(sceneTracksUrl(encodeURIComponent(title)));
   if (!res.ok) throw new Error(`scene tracks missing: ${title}`);
   const raw = await res.json();
   return parseSceneTracks(raw);
 }
 
 export async function loadIconConfigs(): Promise<IconConfig[]> {
-  const res = await fetch("/assets/prebuilt_icon_config.json");
+  const res = await fetch(assetUrl("assets/prebuilt_icon_config.json"));
   if (!res.ok) throw new Error("icon config missing");
   const raw = await res.json();
   return raw.map(
