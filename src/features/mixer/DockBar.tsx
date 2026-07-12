@@ -11,7 +11,9 @@ export function DockBar({ titles, status, onPlayPause }: DockBarProps) {
   return (
     <div className="pointer-events-none absolute inset-x-0 bottom-0 z-20 flex items-center gap-3 px-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
       <div
-        className="pointer-events-auto flex min-w-0 flex-1 items-center gap-2.5 rounded-full px-4 py-3.5 shadow-lg"
+        className={`pointer-events-auto flex min-w-0 flex-1 items-center gap-2.5 rounded-full px-4 py-3.5 shadow-lg ${
+          isPlaying ? "dock-playing-pulse" : ""
+        }`}
         style={{
           background: "linear-gradient(90deg, #5b8def 0%, #7b6cf0 55%, #9b6ae8 100%)",
         }}
@@ -24,7 +26,9 @@ export function DockBar({ titles, status, onPlayPause }: DockBarProps) {
       <button
         type="button"
         aria-label={isPlaying ? "暂停" : "播放"}
-        className="pointer-events-auto flex h-14 w-14 shrink-0 items-center justify-center rounded-full shadow-lg"
+        className={`pointer-events-auto flex h-14 w-14 shrink-0 items-center justify-center rounded-full shadow-lg ${
+          isPlaying ? "dock-playing-pulse" : ""
+        }`}
         style={{
           background: "linear-gradient(145deg, #8b7cf5 0%, #6a8ef0 100%)",
         }}

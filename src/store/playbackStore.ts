@@ -2,6 +2,7 @@ import { Store } from "@tanstack/store";
 import { AudioEngine } from "../audio/engine";
 import { loadSceneTracks } from "../data/loadConfig";
 import type { SceneMeta, TrackConfig } from "../data/types";
+import { audioDebug } from "../lib/audioDebug";
 
 export type PlaybackState = {
   tab: "recommend" | "custom";
@@ -174,6 +175,7 @@ export function createPlaybackController(
       const scene = store.state.scenes[index];
       if (!scene) return;
 
+      audioDebug.info("selectScene", { index, title: scene.title });
       store.setState((s) => ({
         ...s,
         sceneIndex: index,
@@ -187,6 +189,7 @@ export function createPlaybackController(
         store.setState((s) => ({ ...s, status: engine.status }));
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
+        audioDebug.error("selectScene failed", { title: scene.title, message });
         store.setState((s) => ({
           ...s,
           status: "stopped",
@@ -204,6 +207,11 @@ export function createPlaybackController(
         next[audioName] = defaultVolume;
       }
 
+      audioDebug.info("toggleCustom", {
+        audioName,
+        on: audioName in next,
+        count: Object.keys(next).length,
+      });
       // 先更新 UI 选中态；加载失败时保留选中并写入 error，不回滚 customActive
       store.setState((s) => ({ ...s, customActive: next, error: null }));
 
@@ -213,6 +221,7 @@ export function createPlaybackController(
         store.setState((s) => ({ ...s, status: engine.status }));
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
+        audioDebug.error("toggleCustom load failed", { message });
         store.setState((s) => ({
           ...s,
           error: message,
@@ -221,18 +230,21 @@ export function createPlaybackController(
     },
 
     async play() {
+      audioDebug.info("store.play");
       await engine.resume();
       engine.play();
       store.setState((s) => ({ ...s, status: "playing" }));
     },
 
     pause() {
+      audioDebug.info("store.pause");
       engine.pause();
       stopTimerWatch();
       clearTimerFields({ status: "paused" });
     },
 
     stop() {
+      audioDebug.info("store.stop");
       engine.stop();
       stopTimerWatch();
       clearTimerFields({ status: "stopped" });

@@ -7,6 +7,8 @@ import { startRain } from "./effects/rain";
 type SceneStageProps = {
   title: string;
   imagePath: string;
+  /** When true, scene particle/CSS effects run; stopped when false. */
+  playing?: boolean;
   reducedMotion?: boolean;
   children?: ReactNode;
   onPointerDown?: (e: PointerEvent<HTMLDivElement>) => void;
@@ -28,6 +30,7 @@ function startEffect(title: string, container: HTMLElement): EffectHandle {
 export function SceneStage({
   title,
   imagePath,
+  playing = false,
   reducedMotion = false,
   children,
   onPointerDown,
@@ -46,7 +49,7 @@ export function SceneStage({
     const layer = effectsRef.current;
     if (!layer) return;
 
-    if (reducedMotion || prefersReducedMotion()) {
+    if (!playing || reducedMotion || prefersReducedMotion()) {
       layer.replaceChildren();
       return;
     }
@@ -56,7 +59,7 @@ export function SceneStage({
       handle.stop();
       layer.replaceChildren();
     };
-  }, [title, reducedMotion]);
+  }, [title, playing, reducedMotion]);
 
   return (
     <div

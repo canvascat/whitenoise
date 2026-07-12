@@ -39,8 +39,27 @@ body {
   will-change: transform;
 }
 
+@keyframes dock-playing-pulse {
+  0%,
+  100% {
+    transform: scale(1);
+    filter: brightness(1);
+  }
+  50% {
+    transform: scale(1.03);
+    filter: brightness(1.08);
+  }
+}
+
+.dock-playing-pulse {
+  animation: dock-playing-pulse 2.4s ease-in-out infinite;
+  transform-origin: center center;
+  will-change: transform, filter;
+}
+
 @media (prefers-reduced-motion: reduce) {
-  .scene-breath {
+  .scene-breath,
+  .dock-playing-pulse {
     animation: none;
   }
 }

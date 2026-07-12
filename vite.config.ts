@@ -10,6 +10,10 @@ const base = env.GITHUB_PAGES === "true" ? `/${repoName}/` : "/";
 
 export default defineConfig({
   base,
+  build: {
+    // Keep maps in production so iOS Safari remote debugging can map stacks.
+    sourcemap: true,
+  },
   plugins: [
     react(),
     tailwindcss(),

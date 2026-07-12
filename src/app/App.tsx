@@ -4,6 +4,7 @@ import { CustomPage } from "../features/mixer/CustomPage";
 import { RecommendPage } from "../features/scenes/RecommendPage";
 import { TopTabs } from "../features/scenes/TopTabs";
 import { applyChromeColor, resetChromeColor, sampleTopColorFromUrl } from "../lib/dominantColor";
+import { audioDebug } from "../lib/audioDebug";
 import { updateMediaSession } from "../lib/mediaSession";
 import { playbackActions } from "../store/playbackStore";
 import { usePlayback } from "../store/usePlayback";
@@ -38,6 +39,10 @@ export function App() {
     const onVisible = () => {
       if (document.visibilityState !== "visible") return;
       if (status !== "playing") return;
+      audioDebug.info("visibility resume attempt", {
+        status,
+        visibility: document.visibilityState,
+      });
       void playbackActions.play();
     };
     document.addEventListener("visibilitychange", onVisible);

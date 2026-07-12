@@ -99,6 +99,7 @@ export function RecommendPage() {
         <SceneStage
           title={scene.title}
           imagePath={scene.imagePath}
+          playing={status === "playing"}
           reducedMotion={reducedMotion || systemReducedMotion}
           onPointerDown={handlePointerDown}
           onPointerUp={handlePointerUp}

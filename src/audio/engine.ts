@@ -1,4 +1,5 @@
 import type { TrackConfig, LineTrackConfig, PointTrackConfig } from "../data/types";
+import { audioDebug } from "../lib/audioDebug";
 import { fetchAndDecode } from "./decode";
 import { LineTrack } from "./lineTrack";
 import { PointScheduler } from "./pointScheduler";
@@ -93,24 +94,40 @@ export class AudioEngine {
     const gen = ++this.generation;
     this._status = "loading";
     const decodeCtx = this.ensureDecodeContext();
+    audioDebug.info("loadScene start", {
+      gen,
+      trackCount: tracks.length,
+      shouldResume,
+      decodeVia: this.ctx ? "playback-ctx" : "decode-ctx",
+    });
 
     const nextLines: PendingLine[] = [];
     const nextPoints: PendingPoint[] = [];
+    let skipped = 0;
 
     for (const track of tracks) {
-      if (gen !== this.generation) return;
+      if (gen !== this.generation) {
+        audioDebug.warn("loadScene aborted (stale generation)", { gen, current: this.generation });
+        return;
+      }
       try {
         if (track.kind === "line") {
           const loaded = await this.loadLineBuffer(decodeCtx, track);
           if (gen !== this.generation) return;
           if (loaded) nextLines.push(loaded);
+          else skipped += 1;
         } else {
           const loaded = await this.loadPointPending(decodeCtx, track);
           if (gen !== this.generation) return;
           if (loaded) nextPoints.push(loaded);
+          else skipped += 1;
         }
-      } catch {
-        /* skip failed track */
+      } catch (err) {
+        skipped += 1;
+        audioDebug.warn("loadScene track skipped", {
+          track: track.kind === "line" ? track.name : track.variants.join(","),
+          err: String(err),
+        });
       }
     }
 
@@ -121,6 +138,14 @@ export class AudioEngine {
     this.pendingPoints = nextPoints;
     this.lines = [];
     this.points = [];
+
+    audioDebug.info("loadScene done", {
+      gen,
+      lines: nextLines.length,
+      points: nextPoints.length,
+      skipped,
+      shouldResume,
+    });
 
     if (shouldResume) {
       this.play();
@@ -171,12 +196,25 @@ export class AudioEngine {
 
   async resume(): Promise<void> {
     // Must create/resume synchronously within the user-gesture call stack (iOS).
-    const ctx = this.ensureContext();
     this.setAudioSessionType?.("playback");
+    const created = this.ctx == null;
+    const ctx = this.ensureContext();
+    audioDebug.info("resume", {
+      created,
+      stateBefore: ctx.state,
+      sampleRate: ctx.sampleRate,
+      unlocked: this.unlocked,
+    });
     if (ctx.state === "suspended") {
-      await ctx.resume();
+      try {
+        await ctx.resume();
+        audioDebug.info("ctx.resume resolved", { state: ctx.state });
+      } catch (err) {
+        audioDebug.error("ctx.resume failed", { err: String(err), state: ctx.state });
+      }
     }
     this.unlock(ctx);
+    audioDebug.info("resume done", { state: ctx.state, unlocked: this.unlocked });
   }
 
   private unlock(ctx: AudioContext): void {
@@ -188,8 +226,9 @@ export class AudioEngine {
       source.connect(ctx.destination);
       source.start(0);
       this.unlocked = true;
-    } catch {
-      /* unlock best-effort */
+      audioDebug.info("unlock buffer started");
+    } catch (err) {
+      audioDebug.warn("unlock failed", { err: String(err) });
     }
   }
 
@@ -198,6 +237,14 @@ export class AudioEngine {
     // Nodes live on the playback context; rebuild after load/stop or first play.
     if (this.lines.length === 0) {
       this.materialize(ctx);
+    }
+
+    if (this.pendingLines.length === 0 && this.lines.length === 0) {
+      audioDebug.warn("play with zero line tracks", {
+        pendingLines: this.pendingLines.length,
+        pendingPoints: this.pendingPoints.length,
+        ctxState: ctx.state,
+      });
     }
 
     for (const line of this.lines) {
@@ -217,6 +264,12 @@ export class AudioEngine {
       point.scheduler.start();
     }
     this._status = "playing";
+    audioDebug.info("play", {
+      lines: this.lines.length,
+      points: this.points.length,
+      ctxState: ctx.state,
+      unlocked: this.unlocked,
+    });
   }
 
   private playOneShot(name: string, gain: GainNode): void {
@@ -249,6 +302,7 @@ export class AudioEngine {
     }
     this.stopOneShots();
     this._status = "paused";
+    audioDebug.info("pause");
   }
 
   stop(): void {
@@ -256,6 +310,7 @@ export class AudioEngine {
     this.lines = [];
     this.points = [];
     this._status = "stopped";
+    audioDebug.info("stop");
   }
 
   private teardownPlayback(): void {
