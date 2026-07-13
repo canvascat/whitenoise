@@ -19,7 +19,7 @@ export default defineConfig({
     tailwindcss(),
     VitePWA({
       registerType: "autoUpdate",
-      includeAssets: ["icons/*.png"],
+      includeAssets: ["favicon.svg", "icons/*.png"],
       manifest: {
         name: "白噪声",
         short_name: "白噪声",
